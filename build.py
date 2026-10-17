@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import html
 import re
 import zipfile
@@ -51,12 +52,14 @@ def main() -> None:
     pitch = pitch.replace('href="../pitch-deck.pptx" download', 'href="#pitch" data-download-pptx')
     pitch = pitch.replace(' src="../assets/pitch/slide-1.jpg"', '')
 
-    deck = ""
+    deck_version = hashlib.sha256((DOCS / "hackathon-pitch.pptx").read_bytes()).hexdigest()[:12]
+    cover_version = hashlib.sha256((DOCS / "slide-1.jpg").read_bytes()).hexdigest()[:12]
     slides = []
     with zipfile.ZipFile(DOCS / "hackathon-pitch.pptx") as deck_zip:
         slide_count = len([n for n in deck_zip.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)])
     for n in range(1, slide_count + 1):
-        slides.append(f'    {n}: "docs/slide-{n}.jpg"')
+        suffix = f"?v={cover_version}" if n == 1 else ""
+        slides.append(f'    {n}: "docs/slide-{n}.jpg{suffix}"')
     slide_map = "const slideImages = {\n" + ",\n".join(slides) + "\n  };"
 
     demo_js = (SOURCE / "demo/demo.js").read_text(encoding="utf-8").strip()
@@ -122,7 +125,7 @@ def main() -> None:
     window.slideImages = slideImages;
     window.downloadPitchDeck = function () {{
       const download = document.createElement("a");
-      download.href = "docs/hackathon-pitch.pptx";
+      download.href = "docs/hackathon-pitch.pptx?v={deck_version}";
       download.download = "hackathon-pitch.pptx";
       document.body.appendChild(download);
       download.click();

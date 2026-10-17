@@ -789,8 +789,8 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
 <section class="subpage-hero">
       <div class="wrap">
         <a class="crumb" href="#top">← Back to the project</a>
-        <p class="eyebrow"><span class="status-dot"></span> Hackathon pitch · 5 slides</p>
-        <h1>AI energy<br><em>audit prototype</em></h1>
+        <p class="eyebrow"><span class="status-dot"></span> Team AC/DC · Hackathon pitch</p>
+        <h1>Measuring electricity<br><em>per LLM token</em></h1>
         <p class="hero-deck">Five slides: what we built, how the demo works, and the next measurement step.</p>
       </div>
     </section>
@@ -828,7 +828,7 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
   (function () {
     "use strict";
     const slideImages = {
-    1: "docs/slide-1.jpg",
+    1: "docs/slide-1.jpg?v=ac77f347847c",
     2: "docs/slide-2.jpg",
     3: "docs/slide-3.jpg",
     4: "docs/slide-4.jpg",
@@ -837,7 +837,7 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
     window.slideImages = slideImages;
     window.downloadPitchDeck = function () {
       const download = document.createElement("a");
-      download.href = "docs/hackathon-pitch.pptx";
+      download.href = "docs/hackathon-pitch.pptx?v=d284f76eb665";
       download.download = "hackathon-pitch.pptx";
       document.body.appendChild(download);
       download.click();
