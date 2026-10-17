@@ -53,12 +53,12 @@ def main() -> None:
     pitch = pitch.replace(' src="../assets/pitch/slide-1.jpg"', '')
 
     deck_version = hashlib.sha256((DOCS / "hackathon-pitch.pptx").read_bytes()).hexdigest()[:12]
-    cover_version = hashlib.sha256((DOCS / "slide-1.jpg").read_bytes()).hexdigest()[:12]
     slides = []
     with zipfile.ZipFile(DOCS / "hackathon-pitch.pptx") as deck_zip:
         slide_count = len([n for n in deck_zip.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)])
     for n in range(1, slide_count + 1):
-        suffix = f"?v={cover_version}" if n == 1 else ""
+        slide_version = hashlib.sha256((DOCS / f"slide-{n}.jpg").read_bytes()).hexdigest()[:12]
+        suffix = f"?v={slide_version}"
         slides.append(f'    {n}: "docs/slide-{n}.jpg{suffix}"')
     slide_map = "const slideImages = {\n" + ",\n".join(slides) + "\n  };"
 
@@ -71,7 +71,7 @@ def main() -> None:
     viewer_js = viewer_js.replace('  show(current, false);',
                                   '  show(current, false);\n  window.addEventListener("pitchviewshown", () => {\n    const selected = thumbs[current - 1];\n    if (selected && selected.getClientRects().length) selected.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });\n  });')
 
-    nav_home = '''<a href="#case">Prototype</a>
+    nav_home = '''<a href="#trace">Measurement</a>
       <a href="#method">Technical notes</a>
       <a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a>
       <a class="nav-cta" href="#demo">Run demo <span aria-hidden="true">↗</span></a>'''
@@ -82,8 +82,8 @@ def main() -> None:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171918">
-  <meta name="description" content="A hackathon prototype that compares electricity per accepted AI task under quality and response-time limits.">
-  <title>AI Energy Audit</title>
+  <meta name="description" content="Team AC/DC recorded electrical load during local Gemma 4 inference. Explore the UT61B apparent-power trace and LLM batch comparison.">
+  <title>AC/DC · Measuring Power per LLM token</title>
   <style>
 {css}
     .page-view[hidden] {{ display: none !important; }}
@@ -92,7 +92,7 @@ def main() -> None:
 <body class="subpage">
   <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
-    <a class="wordmark" href="#top" aria-label="AI Energy Audit home">AI ENERGY AUDIT <small>HACKATHON PROTOTYPE</small></a>
+    <a class="wordmark" href="#top" aria-label="Team AC/DC home">TEAM AC/DC <small>LLM ENERGY STUDY</small></a>
     <nav class="main-nav" id="mainNav" aria-label="Main navigation">
       {nav_home}
     </nav>
@@ -112,8 +112,8 @@ def main() -> None:
 
   <footer class="site-footer">
     <div class="wrap footer-content">
-      <a class="footer-brand" href="#top">AI ENERGY AUDIT</a>
-      <span id="footerContext">Hackathon prototype · Code and presentation on GitHub</span>
+      <a class="footer-brand" href="#top">TEAM AC/DC</a>
+      <span id="footerContext">Local Gemma 4 measurement · Code and presentation on GitHub</span>
       <div><a href="#top">Home</a><a href="#demo">Browser demo</a><a href="#pitch">Pitch deck</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub ↗</a></div>
     </div>
   </footer>
@@ -151,11 +151,11 @@ def main() -> None:
     }};
     const navMarkup = {{
       home: `{nav_home}`,
-      demo: `<a href="#case">Prototype</a><a href="#method">Technical notes</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a><a class="nav-cta" href="#pitch">Short pitch <span aria-hidden="true">↗</span></a>`,
-      pitch: `<a href="#case">Prototype</a><a href="#demo">Browser demo</a><a class="nav-cta" href="#pitch" data-download-pptx>Download PPTX <span aria-hidden="true">↓</span></a>`
+      demo: `<a href="#trace">Measurement</a><a href="#method">Technical notes</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a><a class="nav-cta" href="#pitch">Short pitch <span aria-hidden="true">↗</span></a>`,
+      pitch: `<a href="#trace">Measurement</a><a href="#demo">Browser demo</a><a class="nav-cta" href="#pitch" data-download-pptx>Download PPTX <span aria-hidden="true">↓</span></a>`
     }};
     const footerText = {{
-      home: "Hackathon prototype · Code and presentation on GitHub",
+      home: "Local Gemma 4 measurement · Code and presentation on GitHub",
       demo: "Illustrative browser demo · No production results claimed",
       pitch: "Hackathon pitch · Five slides"
     }};
@@ -168,7 +168,7 @@ def main() -> None:
       nav.innerHTML = navMarkup[page];
       footerContext.textContent = footerText[page];
       if (page === "pitch") window.dispatchEvent(new Event("pitchviewshown"));
-      if (["case", "method", "pilot", "top"].includes(hash)) {{
+      if (["trace", "case", "method", "pilot", "top"].includes(hash)) {{
         window.requestAnimationFrame(() => {{
           const target = document.getElementById(hash);
           if (target) {{
@@ -186,7 +186,7 @@ def main() -> None:
     function route() {{
       const hash = decodeURIComponent(location.hash.slice(1));
       if (hash === "demo" || hash === "pitch") selectPage(hash, hash);
-      else if (["case", "method", "pilot", "top"].includes(hash)) selectPage("home", hash);
+      else if (["trace", "case", "method", "pilot", "top"].includes(hash)) selectPage("home", hash);
       else if (!hash) selectPage("home", "");
       else if (hash !== "content") selectPage(current, "");
     }}

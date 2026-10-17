@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171918">
-  <meta name="description" content="A hackathon prototype that compares electricity per accepted AI task under quality and response-time limits.">
-  <title>AI Energy Audit</title>
+  <meta name="description" content="Team AC/DC recorded electrical load during local Gemma 4 inference. Explore the UT61B apparent-power trace and LLM batch comparison.">
+  <title>AC/DC · Measuring Power per LLM token</title>
   <style>
 :root {
   color-scheme: dark;
@@ -574,15 +574,34 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
 @media(max-width:900px){.hackathon-hero-grid{grid-template-columns:1fr 1fr;gap:24px}.hackathon-hero h1{font-size:44px}.hackathon-hero .hero-deck{font-size:18px!important}.prototype-grid{grid-template-columns:1fr;gap:22px}.prototype-figure{max-width:680px}.hackathon-photo figcaption{font-size:16px}}
 @media(max-width:640px){.hackathon-hero{padding:28px 0 32px}.hackathon-hero-grid{grid-template-columns:1fr;gap:24px}.hackathon-hero h1{font-size:42px;margin-bottom:16px}.hackathon-hero .eyebrow{margin-bottom:12px}.hackathon-hero .hero-deck{font-size:18px!important}.hackathon-hero .hero-actions{gap:10px;margin-top:20px}.hackathon-photo{max-width:450px}.hackathon-photo img{max-height:320px}.prototype-section,.code-section{padding-block:48px}.technical-notes>summary{padding-block:24px;font-size:20px}.wordmark{max-width:210px;font-size:16px!important}.wordmark small{font-size:16px!important}.site-header{padding-inline:19px}.main-nav .nav-cta{max-width:130px}.prototype-section h2,.code-section h2{font-size:34px}}
 
+/* The supplied trace is its own full-width section, separate from the illustrative calculator example. */
+.measurement-section { padding-block: clamp(58px, 8vw, 96px); }
+.measurement-section h2 { max-width: 30ch; margin: 0 0 24px; font-size: clamp(32px, 4.5vw, 52px); line-height: 1.12; letter-spacing: -.045em; }
+.measurement-figure { margin: 0; }
+.measurement-image-link { display: block; padding: 8px; border: 1px solid rgba(241, 238, 228, .2); background: #151817; }
+.measurement-image-link img { display: block; width: 100%; height: auto; background: #f3f1e8; }
+.measurement-figure figcaption { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 32px; align-items: start; max-width: 1000px; margin-top: 17px; color: #c7cdc3; font-size: 18px; line-height: 1.65; }
+.trace-open-link { color: var(--amber-light); font-size: 16px; text-underline-offset: 4px; }
+@media(max-width:900px) {
+  .main-nav { gap: 16px; }
+  .main-nav > a:not(.nav-cta) { display: none; }
+}
+@media(max-width:640px) {
+  .measurement-section { padding-block: 48px; }
+  .measurement-section h2 { font-size: 34px; }
+  .measurement-image-link { padding: 4px; }
+  .measurement-figure figcaption { grid-template-columns: minmax(0, 1fr); gap: 12px; font-size: 18px; }
+}
+
     .page-view[hidden] { display: none !important; }
   </style>
 </head>
 <body class="subpage">
   <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
-    <a class="wordmark" href="#top" aria-label="AI Energy Audit home">AI ENERGY AUDIT <small>HACKATHON PROTOTYPE</small></a>
+    <a class="wordmark" href="#top" aria-label="Team AC/DC home">TEAM AC/DC <small>LLM ENERGY STUDY</small></a>
     <nav class="main-nav" id="mainNav" aria-label="Main navigation">
-      <a href="#case">Prototype</a>
+      <a href="#trace">Measurement</a>
       <a href="#method">Technical notes</a>
       <a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a>
       <a class="nav-cta" href="#demo">Run demo <span aria-hidden="true">↗</span></a>
@@ -591,9 +610,10 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
 
   <main id="content" tabindex="-1">
     <div class="page-view" id="view-home" data-view="home">
-<section class="hackathon-hero" id="top"><div class="wrap hackathon-hero-grid"><div class="hackathon-copy"><p class="eyebrow">Built at this hackathon</p><h1>AI energy<br><em>audit prototype</em></h1><p class="hero-deck">At this hackathon, we built an open-source prototype that compares electricity per successful AI task for data centers with limited power.</p><div class="hero-actions"><a class="button button-amber" href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">Code and presentation</a><a class="button button-outline" href="#demo">Run the demo</a></div></div><figure class="hackathon-photo"><img src="docs/hackathon-team.jpg" alt="People building the prototype at a hackathon table, with laptops and electrical measurement equipment"><figcaption>Building the prototype at the hackathon</figcaption></figure></div></section>
-<section class="section section-cream prototype-section" id="case"><div class="wrap"><p class="eyebrow eyebrow-dark">The working prototype</p><h2>A lower energy number still has to pass the service test</h2><div class="prototype-grid"><div><p class="large-copy">Enter two batches of LLM work. The prototype compares Wh per accepted task and checks the quality and response-time limits.</p><p>In this demo, B uses less energy per accepted task, but misses both service limits.</p><a class="button button-dark" href="#demo">Try this comparison</a></div><figure class="prototype-figure"><img src="docs/prototype-comparison.svg" alt="Illustrative demo: A uses 0.500 Wh per accepted task and passes; B uses 0.415 Wh per accepted task and fails service limits"><figcaption>Illustrative inputs: A accepts 96% of tasks at 820 ms p95. B accepts 94% at 1,120 ms. The limits are 95% and 1,000 ms.</figcaption></figure></div><p class="prototype-status">The working demo calculates from entered data. Meter and GPU collection remain the next validation step.</p></div></section>
-<section class="section section-charcoal code-section"><div class="wrap"><p class="eyebrow">Everything in GitHub</p><h2>Code, demo and presentation together</h2><p class="section-intro">The repository includes readable HTML, CSS and JavaScript, the comparison example, this photo and the short pitch deck.</p><div class="hero-actions"><a class="button button-amber" href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">Open repository</a><a class="button button-outline" href="#pitch">View the short pitch</a></div></div></section>
+<section class="hackathon-hero" id="top"><div class="wrap hackathon-hero-grid"><div class="hackathon-copy"><p class="eyebrow">Team AC/DC · Hackathon measurement</p><h1>Measuring Power<br><em>per LLM token</em></h1><p class="hero-deck">We ran Gemma 4 locally on a GPU and recorded electrical load using a USB-connected measurement tool. Our open-source project connects electricity use with token output to help data centers with limited power evaluate efficiency.</p><div class="hero-actions"><a class="button button-amber" href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">Code and presentation</a><a class="button button-outline" href="#demo">Run the demo</a></div></div><figure class="hackathon-photo"><img src="docs/hackathon-team.jpg" alt="People building at a hackathon table, with laptops and electrical measurement equipment"><figcaption>Team AC/DC at the hackathon</figcaption></figure></div></section>
+<section class="section section-charcoal measurement-section" id="trace"><div class="wrap"><p class="eyebrow">Real hackathon measurement · Apparent power</p><h2>UT61B apparent power | 116 V RMS</h2><figure class="measurement-figure"><a class="measurement-image-link" href="docs/ut61b-apparent-power.jpg" target="_blank" rel="noopener" aria-label="Open the full-resolution UT61B apparent power chart in a new tab"><img src="docs/ut61b-apparent-power.jpg" alt="Measured UT61B chart showing apparent power in volt-amperes (VA) over elapsed seconds at 116 volts RMS"></a><figcaption><span>Apparent power (VA) at 116 V RMS over elapsed time. Real power (W) = apparent power (VA) × true power factor. Energy per token needs real watt-hours and matched token counts.</span><a class="trace-open-link" href="docs/ut61b-apparent-power.jpg" target="_blank" rel="noopener">Open full-resolution chart in a new tab ↗</a></figcaption></figure></div></section>
+<section class="section section-cream prototype-section" id="case"><div class="wrap"><p class="eyebrow eyebrow-dark">Illustrative browser demo</p><h2>A lower energy number still has to pass the service test</h2><div class="prototype-grid"><div><p class="large-copy">Enter two batches of LLM work. The calculator compares Wh per accepted task and checks the quality and response-time limits.</p><p>In this illustrative demo, B uses less energy per accepted task, but misses both service limits.</p><a class="button button-dark" href="#demo">Try this comparison</a></div><figure class="prototype-figure"><img src="docs/prototype-comparison.svg" alt="Illustrative demo: A uses 0.500 Wh per accepted task and passes; B uses 0.415 Wh per accepted task and fails service limits"><figcaption>Illustrative inputs: A accepts 96% of tasks at 820 ms p95. B accepts 94% at 1,120 ms. The limits are 95% and 1,000 ms.</figcaption></figure></div><p class="prototype-status">The browser calculator uses entered batch data. This example is illustrative and separate from the completed Gemma 4 measurement.</p></div></section>
+<section class="section section-charcoal code-section"><div class="wrap"><p class="eyebrow">Everything in GitHub</p><h2>Code, demo and presentation together</h2><p class="section-intro">The repository includes the measured UT61B trace, readable HTML, CSS and JavaScript, the illustrative comparison, the team photo and the short pitch deck.</p><div class="hero-actions"><a class="button button-amber" href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">Open repository</a><a class="button button-outline" href="#pitch">View the short pitch</a></div></div></section>
 <details class="technical-notes" id="method"><summary class="wrap">Technical notes and measurement plan <span aria-hidden="true">+</span></summary><div class="technical-content">    <section class="section section-cream" id="technical-case">
       <div class="wrap">
         <div class="section-topline"><span>THE DECISION</span><span>01 — 04</span></div>
@@ -790,8 +810,8 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
       <div class="wrap">
         <a class="crumb" href="#top">← Back to the project</a>
         <p class="eyebrow"><span class="status-dot"></span> Team AC/DC · Hackathon pitch</p>
-        <h1>Measuring electricity<br><em>per LLM token</em></h1>
-        <p class="hero-deck">Five slides: what we built, how the demo works, and the next measurement step.</p>
+        <h1>Measuring Power<br><em>per LLM token</em></h1>
+        <p class="hero-deck">Five slides: our local measurement, the browser demo and the enterprise use case.</p>
       </div>
     </section>
     <section class="pitch-main">
@@ -818,8 +838,8 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
 
   <footer class="site-footer">
     <div class="wrap footer-content">
-      <a class="footer-brand" href="#top">AI ENERGY AUDIT</a>
-      <span id="footerContext">Hackathon prototype · Code and presentation on GitHub</span>
+      <a class="footer-brand" href="#top">TEAM AC/DC</a>
+      <span id="footerContext">Local Gemma 4 measurement · Code and presentation on GitHub</span>
       <div><a href="#top">Home</a><a href="#demo">Browser demo</a><a href="#pitch">Pitch deck</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub ↗</a></div>
     </div>
   </footer>
@@ -828,16 +848,16 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
   (function () {
     "use strict";
     const slideImages = {
-    1: "docs/slide-1.jpg?v=ac77f347847c",
-    2: "docs/slide-2.jpg",
-    3: "docs/slide-3.jpg",
-    4: "docs/slide-4.jpg",
-    5: "docs/slide-5.jpg"
+    1: "docs/slide-1.jpg?v=fa5f911f4217",
+    2: "docs/slide-2.jpg?v=867cc18b7c8a",
+    3: "docs/slide-3.jpg?v=abe743801bb8",
+    4: "docs/slide-4.jpg?v=976289d4a2f2",
+    5: "docs/slide-5.jpg?v=fd687979acdf"
   };
     window.slideImages = slideImages;
     window.downloadPitchDeck = function () {
       const download = document.createElement("a");
-      download.href = "docs/hackathon-pitch.pptx?v=d284f76eb665";
+      download.href = "docs/hackathon-pitch.pptx?v=f8da85be5179";
       download.download = "hackathon-pitch.pptx";
       document.body.appendChild(download);
       download.click();
@@ -1247,15 +1267,15 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
       pitch: document.getElementById("view-pitch")
     };
     const navMarkup = {
-      home: `<a href="#case">Prototype</a>
+      home: `<a href="#trace">Measurement</a>
       <a href="#method">Technical notes</a>
       <a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a>
       <a class="nav-cta" href="#demo">Run demo <span aria-hidden="true">↗</span></a>`,
-      demo: `<a href="#case">Prototype</a><a href="#method">Technical notes</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a><a class="nav-cta" href="#pitch">Short pitch <span aria-hidden="true">↗</span></a>`,
-      pitch: `<a href="#case">Prototype</a><a href="#demo">Browser demo</a><a class="nav-cta" href="#pitch" data-download-pptx>Download PPTX <span aria-hidden="true">↓</span></a>`
+      demo: `<a href="#trace">Measurement</a><a href="#method">Technical notes</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a><a class="nav-cta" href="#pitch">Short pitch <span aria-hidden="true">↗</span></a>`,
+      pitch: `<a href="#trace">Measurement</a><a href="#demo">Browser demo</a><a class="nav-cta" href="#pitch" data-download-pptx>Download PPTX <span aria-hidden="true">↓</span></a>`
     };
     const footerText = {
-      home: "Hackathon prototype · Code and presentation on GitHub",
+      home: "Local Gemma 4 measurement · Code and presentation on GitHub",
       demo: "Illustrative browser demo · No production results claimed",
       pitch: "Hackathon pitch · Five slides"
     };
@@ -1268,7 +1288,7 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
       nav.innerHTML = navMarkup[page];
       footerContext.textContent = footerText[page];
       if (page === "pitch") window.dispatchEvent(new Event("pitchviewshown"));
-      if (["case", "method", "pilot", "top"].includes(hash)) {
+      if (["trace", "case", "method", "pilot", "top"].includes(hash)) {
         window.requestAnimationFrame(() => {
           const target = document.getElementById(hash);
           if (target) {
@@ -1286,7 +1306,7 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
     function route() {
       const hash = decodeURIComponent(location.hash.slice(1));
       if (hash === "demo" || hash === "pitch") selectPage(hash, hash);
-      else if (["case", "method", "pilot", "top"].includes(hash)) selectPage("home", hash);
+      else if (["trace", "case", "method", "pilot", "top"].includes(hash)) selectPage("home", hash);
       else if (!hash) selectPage("home", "");
       else if (hash !== "content") selectPage(current, "");
     }

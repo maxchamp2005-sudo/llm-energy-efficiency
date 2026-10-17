@@ -1,12 +1,18 @@
-# Measuring electricity per LLM token
+# Measuring Power per LLM token
 
 **Team AC/DC**
 
-At this hackathon, we ran **Gemma 4 locally on a GPU** and measured **actual power consumption with a USB-connected measurement tool**. Our open-source project connects electricity use with token output to help data centers use limited power more efficiently.
+At this hackathon, we ran **Gemma 4 locally on a GPU** and recorded electrical load using a **USB-connected measurement tool**. Our open-source project connects electricity use with token output to help data centers with limited power evaluate efficiency.
 
 <img src="docs/hackathon-team.jpg" alt="Team AC/DC working at the hackathon" width="560">
 
 **[Run the demo](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#demo)** · **[View the five-slide pitch](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#pitch)** · **[Download the deck](docs/hackathon-pitch.pptx)**
+
+## Hackathon measurement trace
+
+![UT61B apparent power trace at 116 V RMS, with apparent power in VA over elapsed seconds](docs/ut61b-apparent-power.jpg)
+
+**Apparent power (VA) at 116 V RMS over elapsed time.** Real power (W) = apparent power (VA) × true power factor. Energy per token needs real watt-hours and matched token counts.
 
 ## What we built
 
