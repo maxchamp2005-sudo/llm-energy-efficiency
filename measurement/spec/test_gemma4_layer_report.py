@@ -1,0 +1,872 @@
+"""Tests for the standalone Gemma 4 decoder-depth report renderer."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import unittest
+
+
+REPORT_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "gemma4_layer_report.py"
+REPORT_SPEC = importlib.util.spec_from_file_location("gemma4_layer_report", REPORT_SCRIPT)
+assert REPORT_SPEC is not None and REPORT_SPEC.loader is not None
+layer_report = importlib.util.module_from_spec(REPORT_SPEC)
+REPORT_SPEC.loader.exec_module(layer_report)
+
+SCHEMA = "cogni.gemma4.layer_depth.v1"
+PROMPT_HASH = "a" * 64
+MODEL_HASH = "b" * 64
+
+
+def power_measurement(
+    kind: str = "active_power",
+    unit: str = "W",
+    *,
+    mean: float = 104.0,
+    energy: float = 68.0,
+) -> dict:
+    current = kind == "current_ac"
+    return {
+        "status": "available",
+        "kind": kind,
+        "power_unit": unit,
+        "duration_seconds": 1.0,
+        "sample_count": 3,
+        "mean_active_power_watts": None if current else mean,
+        "active_energy_joules": None if current else energy,
+        "mean_apparent_power_va": mean if current else None,
+        "apparent_energy_va_seconds": energy if current else None,
+        "estimated_active_energy_joules": None,
+        "assumed_voltage_volts": None,
+        "assumed_power_factor": None,
+        "curve": [
+            {"elapsed_ms": 0, "value": mean - 4},
+            {"elapsed_ms": 500, "value": mean},
+            {"elapsed_ms": 1000, "value": mean + 4},
+        ],
+    }
+
+
+def utilization_measurement(mean_percent: float = 72.5) -> dict:
+    return {
+        "status": "available",
+        "mean_percent": mean_percent,
+        "duration_seconds": 1.0,
+        "sample_count": 3,
+        "curve": [
+            {"elapsed_ms": 0, "value": mean_percent - 2},
+            {"elapsed_ms": 500, "value": mean_percent},
+            {"elapsed_ms": 1000, "value": mean_percent + 2},
+        ],
+    }
+
+
+def run_record(
+    depth: int,
+    label: str | None = None,
+    *,
+    trial: int = 1,
+    status: str = "completed",
+    actual_tokens: int | None = 256,
+    requested_tokens: int | None = 256,
+    elapsed_ms: int | None = 1000,
+    gpu_measurement: dict | None = None,
+    circuit_measurement: dict | None = None,
+    gpu_utilization: dict | None = None,
+    answer_preview: str | None = "A short synthetic answer.",
+    error: str | None = None,
+) -> dict:
+    return {
+        "label": label or f"depth{depth}-trial{trial}",
+        "decoder_layers": depth,
+        "trial": trial,
+        "status": status,
+        "requested_tokens": requested_tokens,
+        "started_at_epoch_ms": 1000,
+        "ended_at_epoch_ms": 1000 + (elapsed_ms or 0),
+        "elapsed_ms": elapsed_ms,
+        "actual_tokens": actual_tokens,
+        "model_identity": "gemma-4-test",
+        "model_sha256": MODEL_HASH,
+        "parameter_count": 25_000_000_000,
+        "weight_bytes": 14_000_000_000,
+        "answer_preview": answer_preview,
+        "error": error,
+        "gpu_measurement": gpu_measurement,
+        "circuit_measurement": circuit_measurement,
+        "gpu_utilization_measurement": gpu_utilization,
+    }
+
+
+def report_with(*runs: dict, requested_tokens: int = 256) -> dict:
+    return {
+        "schema": SCHEMA,
+        "campaign_id": "gemma4-depth-fixed-256",
+        "prompt_sha256": PROMPT_HASH,
+        "requested_tokens": requested_tokens,
+        "notes": "Fixed generation with ignore_eos.",
+        "runs": list(runs),
+    }
+
+
+def paired_run(depth: int = 48, label: str = "paired", *, trial: int = 1) -> dict:
+    gpu = power_measurement(mean=100, energy=100)
+    fluke = power_measurement("current_ac", "VA", mean=170, energy=170)
+    for measurement in (gpu, fluke):
+        measurement.update(start_ms=1000, end_ms=2000)
+    # Different sample cadences do not change the common request window.
+    fluke["curve"] = [
+        {"elapsed_ms": 0, "value": 166},
+        {"elapsed_ms": 400, "value": 170},
+        {"elapsed_ms": 600, "value": 170},
+        {"elapsed_ms": 1000, "value": 174},
+    ]
+    fluke["sample_count"] = 4
+    return run_record(
+        depth, label, trial=trial, gpu_measurement=gpu, circuit_measurement=fluke
+    )
+
+
+def ut61b_report(*runs: dict) -> dict:
+    report = report_with(*runs)
+    report["circuit_meter"] = "ut61b"
+    report["measurement_clock"] = "gputer"
+    for run in report["runs"]:
+        measurement = run.get("circuit_measurement")
+        if measurement is not None:
+            measurement["meter"] = "ut61b"
+            measurement["selector"] = (
+                'ut61b_current_amperes{circuit="gputer",meter="ut61b",mode="ac"}'
+            )
+            measurement["metric"] = {
+                "__name__": "ut61b_current_amperes",
+                "circuit": "gputer",
+                "meter": "ut61b",
+                "mode": "ac",
+            }
+    return report
+
+
+class LayerReportTests(unittest.TestCase):
+    def test_ut61b_report_metadata_and_source_identity_are_preserved(self) -> None:
+        run = paired_run(label="ut61b-depth48")
+        run["token_progress"] = {
+            "status": "available", "basis": "received_token_ids", "final_tokens": 256,
+            "points": [
+                {"elapsed_ms": 0, "generated_tokens": 0},
+                {"elapsed_ms": 400, "generated_tokens": 100},
+                {"elapsed_ms": 1000, "generated_tokens": 256},
+            ],
+        }
+        report = ut61b_report(run)
+
+        validated = layer_report.validate_report(report)
+        payload = layer_report._depth_chart_payload(validated)
+
+        self.assertEqual(validated["circuit_meter"], "ut61b")
+        self.assertEqual(validated["measurement_clock"], "gputer")
+        self.assertEqual(payload["circuit_meter"], "ut61b")
+        self.assertEqual(payload["measurement_clock"], "gputer")
+        self.assertEqual(report["runs"][0]["circuit_measurement"]["meter"], "ut61b")
+        self.assertEqual(
+            report["runs"][0]["circuit_measurement"]["selector"],
+            'ut61b_current_amperes{circuit="gputer",meter="ut61b",mode="ac"}',
+        )
+        self.assertEqual(payload["runs"][0]["fluke"]["unit"], "VA")
+        self.assertEqual(payload["runs"][0]["fluke"]["integral_unit"], "VA·s")
+        self.assertEqual(payload["runs"][0]["token_progress"]["points"], [[0, 0], [400, 100], [1000, 256]])
+
+    def test_meter_validation_rejects_unsupported_or_mismatched_identity(self) -> None:
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report({**report_with(paired_run()), "circuit_meter": "other"})
+
+        mismatched_report = ut61b_report(paired_run())
+        mismatched_report["runs"][0]["circuit_measurement"]["meter"] = "fluke"
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(mismatched_report)
+
+        missing_identity = ut61b_report(paired_run())
+        del missing_identity["runs"][0]["circuit_measurement"]["meter"]
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(missing_identity)
+
+        unsupported_measurement = report_with(paired_run())
+        unsupported_measurement["runs"][0]["circuit_measurement"]["meter"] = "other"
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(unsupported_measurement)
+
+        relabeled_ut61b = report_with(paired_run())
+        relabeled_ut61b["runs"][0]["circuit_measurement"].update(
+            {
+                "selector": (
+                    'ut61b_current_amperes{circuit="gputer",meter="ut61b",mode="ac"}'
+                ),
+                "metric": {
+                    "__name__": "ut61b_current_amperes",
+                    "circuit": "gputer",
+                    "meter": "ut61b",
+                    "mode": "ac",
+                },
+            }
+        )
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(relabeled_ut61b)
+
+        misleading_metric = ut61b_report(paired_run())
+        misleading_metric["runs"][0]["circuit_measurement"]["selector"] = (
+            'ut61b_current_amperes{circuit="gputer",meter="fluke",mode="ac"}'
+        )
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(misleading_metric)
+
+        lookalike_metric = ut61b_report(paired_run())
+        lookalike_metric["runs"][0]["circuit_measurement"]["selector"] = (
+            "ut61b_current_amperesBogus"
+        )
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(lookalike_metric)
+
+        wrong_metric_name = ut61b_report(paired_run())
+        wrong_metric_name["runs"][0]["circuit_measurement"]["metric"]["__name__"] = (
+            "fluke_current_amperes"
+        )
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(wrong_metric_name)
+
+        wrong_clock = ut61b_report(paired_run())
+        wrong_clock["measurement_clock"] = "other-clock"
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(wrong_clock)
+
+        active_energy_on_apparent_source = ut61b_report(paired_run())
+        active_energy_on_apparent_source["runs"][0]["circuit_measurement"][
+            "estimated_active_energy_joules"
+        ] = 12.5
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.validate_report(active_energy_on_apparent_source)
+
+    def test_unavailable_ut61b_measurement_retains_source_identity(self) -> None:
+        run = paired_run()
+        run["circuit_measurement"] = {
+            "status": "unavailable",
+            "reason": "no samples",
+            "meter": "ut61b",
+            "selector": (
+                'ut61b_current_amperes{circuit="gputer",meter="ut61b",mode="ac"}'
+            ),
+            "metric": {
+                "__name__": "ut61b_current_amperes",
+                "circuit": "gputer",
+                "meter": "ut61b",
+                "mode": "ac",
+            },
+        }
+
+        validated = layer_report.validate_report(ut61b_report(run))
+
+        self.assertEqual(validated["runs"][0]["circuit_measurement"]["status"], "unavailable")
+        self.assertIn("UT61B unavailable: no samples", layer_report.render_html(validated))
+
+    def test_ut61b_full_html_uses_truthful_meter_copy_and_apparent_units(self) -> None:
+        rendered = layer_report.render_html(ut61b_report(paired_run(), paired_run(16, "shallow")))
+        visible_html = re.sub(r"<script\b.*?</script>", "", rendered, flags=re.DOTALL)
+
+        self.assertIn("UT61B", visible_html)
+        self.assertNotIn("Fluke", visible_html)
+        self.assertIn("UT61B circuit mean (VA)", visible_html)
+        self.assertIn("UT61B integral (VA·s)", visible_html)
+        self.assertIn("UT61B circuit meter", visible_html)
+        self.assertIn("Measurement clock: gputer", visible_html)
+        self.assertNotIn("UT61B circuit mean (W)", visible_html)
+        self.assertNotIn("UT61B integral (J)", visible_html)
+
+        data = re.search(
+            r'<script type="application/json" id="depth-chart-data">(.*?)</script>',
+            rendered, re.DOTALL,
+        )
+        self.assertIsNotNone(data)
+        payload = json.loads(data.group(1))
+        self.assertEqual(payload["circuit_meter"], "ut61b")
+        self.assertEqual(payload["measurement_clock"], "gputer")
+        self.assertNotIn("presentation_source", payload)
+
+        presentation = layer_report.render_presentation(
+            ut61b_report(paired_run(), paired_run(16, "shallow"))
+        )
+        presentation_copy = re.sub(r"<script\b.*?</script>", "", presentation, flags=re.DOTALL)
+        self.assertIn("UT61B", presentation_copy)
+        self.assertNotIn("NVIDIA", presentation_copy)
+        self.assertNotIn("Fluke", presentation_copy)
+        self.assertIn("Measurement clock: gputer", presentation_copy)
+        self.assertIn(
+            "UT61B reports whole-circuit apparent power in VA and apparent-power integral in VA·s",
+            presentation_copy,
+        )
+        self.assertIn("VA·s integrates the original piecewise-linear samples", presentation_copy)
+        self.assertNotIn("energy uses original", presentation_copy)
+        presentation_data = re.search(
+            r'<script type="application/json" id="depth-chart-data">(.*?)</script>',
+            presentation, re.DOTALL,
+        )
+        self.assertIsNotNone(presentation_data)
+        self.assertEqual(json.loads(presentation_data.group(1))["presentation_source"], "fluke")
+        self.assertEqual(json.loads(presentation_data.group(1))["circuit_energy_estimate"], {"power_factor": 1, "basis": "assumed"})
+        self.assertIn("estimated J/token assuming PF=1", presentation_copy)
+        self.assertNotIn("circuit_energy_estimate", payload)
+
+    def test_canvas_keeps_actual_token_progress_and_historical_fallback(self) -> None:
+        observed = paired_run(label="observed")
+        observed["token_progress"] = {
+            "status": "available", "basis": "received_token_ids", "final_tokens": 256,
+            "points": [
+                {"elapsed_ms": 0, "generated_tokens": 0},
+                {"elapsed_ms": 200, "generated_tokens": 1},
+                {"elapsed_ms": 1000, "generated_tokens": 256},
+            ],
+            "remote_write": {"status": "available"},
+        }
+        report = report_with(observed, paired_run(label="historical"))
+        layer_report.validate_report(report)
+        payload = layer_report._depth_chart_payload(report)
+        self.assertEqual(payload["runs"][0]["token_progress"], {
+            "basis": "received_token_ids", "points": [[0, 0], [200, 1], [1000, 256]],
+        })
+        self.assertNotIn("token_progress", payload["runs"][1])
+
+    def test_rejects_available_but_invalid_token_progress(self) -> None:
+        valid = {
+            "status": "available", "basis": "received_token_ids", "final_tokens": 256,
+            "points": [{"elapsed_ms": 0, "generated_tokens": 0},
+                       {"elapsed_ms": 1000, "generated_tokens": 256}],
+        }
+        for mutation in (
+            {"basis": "text_chunks"}, {"final_tokens": 255},
+            {"points": []},
+            {"points": [{"elapsed_ms": 0, "generated_tokens": 0},
+                        {"elapsed_ms": 999, "generated_tokens": 256}]},
+            {"points": [{"elapsed_ms": 0, "generated_tokens": 0},
+                        {"elapsed_ms": 1000, "generated_tokens": 257}]},
+            {"points": [{"elapsed_ms": 0, "generated_tokens": 0},
+                        {"elapsed_ms": 400, "generated_tokens": 100},
+                        {"elapsed_ms": 600, "generated_tokens": 99},
+                        {"elapsed_ms": 1000, "generated_tokens": 256}]},
+            {"points": [{"elapsed_ms": 0, "generated_tokens": 0},
+                        {"elapsed_ms": True, "generated_tokens": 1},
+                        {"elapsed_ms": 1000, "generated_tokens": 256}]},
+        ):
+            with self.subTest(mutation=mutation):
+                run = paired_run()
+                run["token_progress"] = {**valid, **mutation}
+                with self.assertRaises(layer_report.ReportError):
+                    layer_report.validate_report(report_with(run))
+
+    def test_canvas_payload_preserves_native_times_units_and_trial_identity(self) -> None:
+        before = paired_run(label="depth48-before", trial=1)
+        after = paired_run(label="depth48-after", trial=1)
+        shallow = paired_run(16, "depth16", trial=2)
+        report = report_with(before, after, shallow)
+        payload = layer_report._depth_chart_payload(report)
+
+        self.assertEqual(payload["schema"], "cogni.gemma4.depth_chart.v1")
+        self.assertEqual(payload["requested_tokens"], 256)
+        self.assertEqual(payload["excluded_count"], 0)
+        self.assertEqual([run["label"] for run in payload["runs"]],
+                         ["depth48-before", "depth48-after", "depth16"])
+        self.assertEqual(payload["runs"][2]["trial"], 2)
+        run = payload["runs"][0]
+        self.assertEqual(run["duration_ms"], 1000)
+        self.assertEqual(run["gpu"], {
+            "unit": "W", "integral_unit": "J", "mean": 100, "integral": 100,
+            "points": [[0, 96], [500, 100], [1000, 104]],
+        })
+        self.assertEqual(run["fluke"]["unit"], "VA")
+        self.assertEqual(run["fluke"]["integral_unit"], "VA·s")
+        self.assertEqual(run["fluke"]["points"],
+                         [[0, 166], [400, 170], [600, 170], [1000, 174]])
+
+    def test_canvas_excludes_unpaired_short_and_ambiguous_trials(self) -> None:
+        good = paired_run(16, "good")
+        missing = paired_run(label="missing")
+        missing["circuit_measurement"] = None
+        short = paired_run(label="short")
+        short["actual_tokens"] = 255
+        first = paired_run(label="duplicate")
+        duplicate = paired_run(label="duplicate")
+        payload = layer_report._depth_chart_payload(
+            report_with(good, missing, short, first, duplicate)
+        )
+        self.assertEqual([run["label"] for run in payload["runs"]], ["good"])
+        self.assertEqual(payload["excluded_count"], 4)
+
+    def test_canvas_data_is_embedded_safely_and_assets_are_standalone(self) -> None:
+        label = '</script><img src=x onerror="alert(1)">'
+        rendered = layer_report.render_html(report_with(paired_run(16, label)))
+        self.assertIn('id="depth-explorer"', rendered)
+        match = re.search(
+            r'<script type="application/json" id="depth-chart-data">(.*?)</script>',
+            rendered, re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        self.assertNotIn("<", match.group(1))
+        self.assertEqual(json.loads(match.group(1))["runs"][0]["label"], label)
+        self.assertNotRegex(rendered, r'<script[^>]+src=')
+        self.assertNotRegex(rendered, r'<link[^>]+rel=["\']stylesheet')
+
+    def test_presentation_keeps_gate_and_units_without_detailed_tables(self) -> None:
+        report = report_with(paired_run(), paired_run(16, "shallow"))
+        rendered = layer_report.render_presentation(report)
+        self.assertIn('id="depth-explorer"', rendered)
+        self.assertIn("Fixed-token gate: eligible", rendered)
+        self.assertIn("quality is unvalidated", rendered)
+        self.assertIn("W and J", rendered)
+        self.assertIn("VA and VA·s", rendered)
+        self.assertNotIn("Summary by run label", rendered)
+        self.assertNotIn("Run comparison (details)", rendered)
+        data = re.search(
+            r'<script type="application/json" id="depth-chart-data">(.*?)</script>',
+            rendered, re.DOTALL,
+        )
+        self.assertIsNotNone(data)
+        self.assertNotIn("presentation_source", json.loads(data.group(1)))
+        self.assertNotRegex(rendered, r'<script[^>]+src=')
+        report["runs"][1]["actual_tokens"] = 255
+        self.assertIn("Fixed-token gate: blocked", layer_report.render_presentation(report))
+
+    def test_sensor_pairs_show_common_windows_with_separate_units(self) -> None:
+        report = report_with(paired_run(), paired_run(16, "shallow"))
+        rendered = layer_report.render_html(report)
+        section = rendered.split('id="sensor-comparison"', 1)[1].split("</section>", 1)[0]
+
+        self.assertIn("Matched sensor windows: 2 / 2", section)
+        self.assertIn("GPU board mean (W)", section)
+        self.assertIn("Fluke circuit mean (VA)", section)
+        self.assertIn("Fluke integral (VA·s)", section)
+        self.assertIn('data-label="GPU W">100</td>', section)
+        self.assertIn('data-label="Fluke VA">170</td>', section)
+        self.assertIn("Do not subtract these readings", section)
+        self.assertIn("power factor", section)
+        self.assertIn('aria-label="GPU active power (W) over elapsed time (ms)"', section)
+        self.assertIn('aria-label="Fluke apparent power (VA) over elapsed time (ms)"', section)
+        self.assertEqual(section.count("1000 ms</text>"), 4)
+        self.assertLess(rendered.index('id="sensor-comparison"'), rendered.index("Summary by run label"))
+
+    def test_sensor_pairing_rejects_missing_shifted_and_reversed_windows(self) -> None:
+        for field, replacement in (
+            ("start_ms", None),
+            ("start_ms", 1001),
+            ("end_ms", 1999),
+            ("end_ms", 999),
+            ("start_ms", True),
+        ):
+            with self.subTest(field=field, replacement=replacement):
+                run = paired_run()
+                run["circuit_measurement"][field] = replacement
+                self.assertIsNotNone(layer_report._paired_window_reason(run))
+        run = paired_run()
+        run["ended_at_epoch_ms"] = run["started_at_epoch_ms"]
+        self.assertIsNotNone(layer_report._paired_window_reason(run))
+
+    def test_sensor_pairing_rejects_partial_or_unordered_curves(self) -> None:
+        for curve in (
+            [{"elapsed_ms": 1, "value": 100}, {"elapsed_ms": 1000, "value": 100}],
+            [{"elapsed_ms": 0, "value": 100}, {"elapsed_ms": 999, "value": 100}],
+            [{"elapsed_ms": 0, "value": 100}, {"elapsed_ms": 0, "value": 100}, {"elapsed_ms": 1000, "value": 100}],
+            [{"elapsed_ms": 0, "value": 100}, {"elapsed_ms": 1001, "value": 100}, {"elapsed_ms": 1000, "value": 100}],
+            [],
+        ):
+            with self.subTest(curve=curve):
+                run = paired_run()
+                run["gpu_measurement"]["curve"] = curve
+                self.assertIsNotNone(layer_report._paired_window_reason(run))
+        run = paired_run()
+        run["gpu_measurement"]["duration_seconds"] = 2
+        self.assertIsNotNone(layer_report._paired_window_reason(run))
+
+    def test_sensor_pairing_rejects_unavailable_or_incompatible_sources(self) -> None:
+        for measurement in (
+            None,
+            {"status": "unavailable", "reason": "offline"},
+            power_measurement("active_power", "W"),
+        ):
+            with self.subTest(measurement=measurement):
+                run = paired_run()
+                run["circuit_measurement"] = measurement
+                self.assertIsNotNone(layer_report._paired_window_reason(run))
+
+    def test_paired_summary_requires_every_trial_to_be_matched_and_exact(self) -> None:
+        for defect in ("window", "tokens"):
+            with self.subTest(defect=defect):
+                first = paired_run(label="paired-batch")
+                second = paired_run(label="paired-batch", trial=2)
+                if defect == "window":
+                    second["gpu_measurement"]["start_ms"] += 1
+                else:
+                    second["actual_tokens"] = 255
+                rendered = layer_report.render_html(report_with(first, second))
+                section = rendered.split('id="sensor-comparison"', 1)[1].split("</section>", 1)[0]
+                row = re.search(r"<tr>.*?paired-batch.*?</tr>", section, re.DOTALL).group(0)
+                self.assertEqual(row.count("Unavailable"), 4)
+                self.assertIn("All trials must have exact token counts and matched sensor windows", section)
+
+    def test_fixed_count_gate_and_report_caveats_are_explicit(self) -> None:
+        report = report_with(
+            run_record(48, gpu_measurement=power_measurement(), circuit_measurement=power_measurement("current_ac", "VA")),
+            run_record(32, gpu_measurement=power_measurement(mean=90, energy=59), circuit_measurement=power_measurement("current_ac", "VA", mean=158, energy=101)),
+            run_record(16, gpu_measurement=power_measurement(mean=78, energy=50), circuit_measurement=power_measurement("current_ac", "VA", mean=145, energy=92)),
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("Fixed-token comparison gate: eligible", rendered)
+        self.assertIn("expected 16/32/48 decoder-depth set is represented", rendered)
+        self.assertIn("Actual tokens: 256", rendered)
+        self.assertIn("Observed throughput: 256 tokens/s", rendered)
+        self.assertIn("GPU board energy: 68 J", rendered)
+        self.assertIn("GPU energy per actual token: 0.2656 J/token", rendered)
+        self.assertIn("Fluke apparent energy: 68 VA·s", rendered)
+        self.assertIn("Answer quality is unvalidated", rendered)
+        self.assertIn("nonsense accuracy is accepted", rendered)
+        self.assertIn("does not establish full-depth generation", rendered)
+        self.assertIn("shared host", rendered)
+        self.assertIn("sample window: 1 s", rendered)
+        self.assertIn("weight size is not a power measurement", rendered)
+
+    def test_mismatch_failure_and_unknown_count_block_fixed_token_comparison(self) -> None:
+        report = report_with(
+            run_record(48, actual_tokens=256),
+            run_record(32, actual_tokens=255, label="depth32-short"),
+            run_record(16, status="failed", actual_tokens=None, label="depth16-failed", error="backend stopped"),
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("Fixed-token comparison gate: blocked", rendered)
+        self.assertIn("depth32-short: observed 255 of 256 requested", rendered)
+        self.assertIn("depth16-failed: status is failed", rendered)
+        self.assertIn("depth16-failed: actual token count unavailable", rendered)
+
+    def test_per_run_requested_tokens_must_match_report_level_request(self) -> None:
+        report = report_with(
+            run_record(48, requested_tokens=512),
+            run_record(32, requested_tokens=256),
+            requested_tokens=256,
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("Fixed-token comparison gate: blocked", rendered)
+        self.assertIn("depth48-trial1: run requested 512, report requests 256", rendered)
+        self.assertIn("512 run-requested", rendered)
+
+    def test_missing_per_run_request_blocks_eligibility(self) -> None:
+        report = report_with(
+            run_record(48, requested_tokens=None),
+            run_record(32),
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("Fixed-token comparison gate: blocked", rendered)
+        self.assertIn("depth48-trial1: run requested token count unavailable", rendered)
+
+    def test_two_depths_are_labeled_partial_campaign(self) -> None:
+        rendered = layer_report.render_html(report_with(run_record(48), run_record(32)))
+
+        self.assertIn("Fixed-token comparison gate: eligible", rendered)
+        self.assertIn(
+            "Eligible for a partial depth comparison; expected campaign depths are 16/32/48, with 16 not represented.",
+            rendered,
+        )
+
+    def test_label_summary_averages_exact_trials_and_keeps_before_after_separate(self) -> None:
+        report = report_with(
+            run_record(
+                48,
+                "depth48-before",
+                trial=1,
+                elapsed_ms=1000,
+                gpu_measurement=power_measurement(mean=100, energy=50),
+            ),
+            run_record(
+                48,
+                "depth48-before",
+                trial=2,
+                elapsed_ms=3000,
+                gpu_measurement=power_measurement(mean=200, energy=70),
+            ),
+            run_record(
+                48,
+                "depth48-after",
+                status="failed",
+                actual_tokens=None,
+                error="backend stopped",
+            ),
+            run_record(32, "depth32-before"),
+        )
+        rendered = layer_report.render_html(report)
+
+        before_match = re.search(r"<tr><td>depth48-before</td>.*?</tr>", rendered, re.DOTALL)
+        after_match = re.search(r"<tr><td>depth48-after</td>.*?</tr>", rendered, re.DOTALL)
+        self.assertIsNotNone(before_match)
+        self.assertIsNotNone(after_match)
+        before_row = before_match.group(0)
+        after_row = after_match.group(0)
+        self.assertIn("2 / 2", before_row)
+        self.assertIn("25,000,000,000", before_row)
+        self.assertIn("<td>2</td>", before_row)  # mean elapsed seconds
+        self.assertIn("<td>150</td>", before_row)  # mean-of-trials GPU watts
+        self.assertIn("<td>60</td>", before_row)  # mean GPU joules per request
+        self.assertIn("<td>0.2344</td>", before_row)  # mean GPU joules per actual token
+        self.assertIn("0 / 1", after_row)
+        self.assertGreater(rendered.index("Summary by run label"), rendered.index("Fixed-token comparison gate"))
+        self.assertLess(rendered.index("Summary by run label"), rendered.index("Sampled curves"))
+        self.assertLess(rendered.index("Sampled curves"), rendered.index("Run comparison (details)"))
+        self.assertIn("Unavailable", after_row)
+
+    def test_label_summary_watts_require_available_active_power_units(self) -> None:
+        report = report_with(
+            run_record(
+                48,
+                "depth48-mixed-unit",
+                trial=1,
+                gpu_measurement=power_measurement("active_power", "W"),
+            ),
+            run_record(
+                48,
+                "depth48-mixed-unit",
+                trial=2,
+                gpu_measurement=power_measurement("current_ac", "VA"),
+            ),
+            run_record(32, "depth32-before"),
+        )
+        rendered = layer_report.render_html(report)
+        row_match = re.search(r"<tr><td>depth48-mixed-unit</td>.*?</tr>", rendered, re.DOTALL)
+
+        self.assertIsNotNone(row_match)
+        self.assertIn("2 / 2", row_match.group(0))
+        self.assertEqual(row_match.group(0).count("Unavailable"), 3)
+
+    def test_missing_units_do_not_turn_energy_into_watts_or_joules(self) -> None:
+        measurement = power_measurement()
+        measurement.pop("kind")
+        measurement.pop("power_unit")
+        report = report_with(
+            run_record(
+                48,
+                gpu_measurement=measurement,
+                circuit_measurement={"status": "unavailable", "reason": "Fluke <offline>"},
+            ),
+            run_record(32, gpu_measurement=None, circuit_measurement=None),
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("GPU board power: Unavailable", rendered)
+        self.assertIn("power unit unavailable or inconsistent", rendered)
+        self.assertNotIn("GPU board energy: 68 J", rendered)
+        self.assertNotIn("GPU board power: 104 W", rendered)
+        self.assertIn("Fluke unavailable: Fluke &lt;offline&gt;", rendered)
+
+    def test_gpu_and_circuit_plots_use_separate_axes_and_skip_mixed_gpu_units(self) -> None:
+        report = report_with(
+            run_record(
+                48,
+                gpu_measurement=power_measurement("active_power", "W"),
+                circuit_measurement=power_measurement("current_ac", "VA", mean=170, energy=110),
+            ),
+            run_record(
+                32,
+                gpu_measurement=power_measurement("current_ac", "VA", mean=96, energy=62),
+                circuit_measurement=power_measurement("current_ac", "VA", mean=155, energy=100),
+            ),
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("GPU chart omitted because available curves mix W and VA", rendered)
+        self.assertIn('aria-label="Circuit apparent power (VA) over elapsed time (ms)"', rendered)
+        self.assertIn("decoder depth 48", rendered)
+        self.assertIn("decoder depth 32", rendered)
+
+    def test_gpu_utilization_has_its_own_percent_plot(self) -> None:
+        report = report_with(
+            run_record(48, gpu_utilization=utilization_measurement(76.5)),
+            run_record(32, gpu_utilization=utilization_measurement(64.0)),
+        )
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("Mean GPU utilization: 76.5%", rendered)
+        self.assertIn('aria-label="GPU utilization (%) over elapsed time (ms)"', rendered)
+
+    def test_escapes_untrusted_fields_and_marks_failed_measurements_unavailable(self) -> None:
+        run = run_record(
+            48,
+            label='<img src=x onerror="alert(1)">',
+            status="failed",
+            actual_tokens=None,
+            error="backend <crashed>",
+            answer_preview='<script>alert("x")</script>',
+            gpu_measurement={"status": "unavailable", "reason": "device <busy>"},
+            circuit_measurement={"status": "unavailable", "reason": "meter unavailable"},
+        )
+        report = report_with(run)
+        report["campaign_id"] = '<b>campaign</b>'
+        report["notes"] = "<svg onload=alert(1)>"
+        rendered = layer_report.render_html(report)
+
+        self.assertIn("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;", rendered)
+        self.assertIn("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;", rendered)
+        self.assertIn("backend &lt;crashed&gt;", rendered)
+        self.assertIn("&lt;svg onload=alert(1)&gt;", rendered)
+        self.assertNotIn('<script>alert("x")</script>', rendered)
+        self.assertIn("GPU unavailable: device &lt;busy&gt;", rendered)
+
+    def test_rejects_invalid_depth_counts_and_non_finite_samples(self) -> None:
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.render_html(report_with(run_record(0)))
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.render_html(report_with(run_record(48, actual_tokens=1.5)))
+        bad_measurement = power_measurement()
+        bad_measurement["curve"][1]["value"] = float("nan")
+        with self.assertRaises(layer_report.ReportError):
+            layer_report.render_html(report_with(run_record(48, gpu_measurement=bad_measurement)))
+
+    def test_merge_cli_combines_per_depth_batches(self) -> None:
+        left = report_with(run_record(48, label="depth48-before"))
+        right = report_with(run_record(16, label="depth16-before"))
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "depth48.json"
+            second = Path(directory) / "depth16.json"
+            output = Path(directory) / "layer-report.html"
+            first.write_text(json.dumps(left), encoding="utf-8")
+            second.write_text(json.dumps(right), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPORT_SCRIPT),
+                    "merge",
+                    "--input",
+                    str(first),
+                    str(second),
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rendered = output.read_text(encoding="utf-8")
+            self.assertIn("Fixed-token comparison gate: eligible", rendered)
+            self.assertIn("depth48-before", rendered)
+            self.assertIn("depth16-before", rendered)
+            self.assertIn("depth48.json", rendered)
+            self.assertIn("depth16.json", rendered)
+
+    def test_merge_recomputes_full_depth_and_drops_mixed_model_file_size(self) -> None:
+        before = report_with(run_record(48, label="depth48-before"))
+        before.update(
+            {
+                "full_depth": True,
+                "model_file_bytes": 1000,
+                "ignore_eos": True,
+                "cache_prompt": False,
+                "temperature": 0,
+                "seed": 1,
+                "warmup_tokens": 8,
+            }
+        )
+        after = report_with(run_record(16, label="depth16-after"))
+        after["runs"][0]["model_sha256"] = "c" * 64
+        after["runs"][0]["model_identity"] = "another-gemma-4-test"
+        after.update(
+            {
+                "full_depth": False,
+                "model_file_bytes": 900,
+                "ignore_eos": True,
+                "cache_prompt": False,
+                "temperature": 0,
+                "seed": 1,
+                "warmup_tokens": 8,
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "before.json"
+            second = Path(directory) / "after.json"
+            first.write_text(json.dumps(before), encoding="utf-8")
+            second.write_text(json.dumps(after), encoding="utf-8")
+
+            merged = layer_report._merge_reports([first, second])
+
+        self.assertFalse(merged["full_depth"])
+        self.assertNotIn("model_file_bytes", merged)
+        self.assertEqual(merged["ignore_eos"], True)
+        self.assertEqual(merged["warmup_tokens"], 8)
+
+    def test_merge_rejects_different_or_partially_missing_generation_settings(self) -> None:
+        cases = (
+            ({"temperature": 0}, {"temperature": 0.5}),
+            ({"ignore_eos": True}, {"ignore_eos": False}),
+            ({"cache_prompt": False}, {"cache_prompt": True}),
+            ({"seed": 1}, {"seed": 2}),
+            ({"warmup_tokens": 8}, {}),
+        )
+        for left_settings, right_settings in cases:
+            with self.subTest(setting=(left_settings, right_settings)):
+                left = report_with(run_record(48, label="depth48-before"))
+                left.update(left_settings)
+                right = report_with(run_record(16, label="depth16-after"))
+                right.update(right_settings)
+                with tempfile.TemporaryDirectory() as directory:
+                    first = Path(directory) / "before.json"
+                    second = Path(directory) / "after.json"
+                    first.write_text(json.dumps(left), encoding="utf-8")
+                    second.write_text(json.dumps(right), encoding="utf-8")
+
+                    with self.assertRaises(layer_report.ReportError):
+                        layer_report._merge_reports([first, second])
+
+    def test_merge_rejects_ut61b_and_legacy_fluke_roots_in_either_order(self) -> None:
+        legacy_fluke = report_with(paired_run())
+        ut61b = ut61b_report(paired_run())
+        for left_report, right_report in ((legacy_fluke, ut61b), (ut61b, legacy_fluke)):
+            with self.subTest(left_meter=left_report.get("circuit_meter")):
+                with tempfile.TemporaryDirectory() as directory:
+                    first = Path(directory) / "first.json"
+                    second = Path(directory) / "second.json"
+                    first.write_text(json.dumps(left_report), encoding="utf-8")
+                    second.write_text(json.dumps(right_report), encoding="utf-8")
+
+                    with self.assertRaisesRegex(layer_report.ReportError, "circuit_meter"):
+                        layer_report._merge_reports([first, second])
+
+    def test_single_report_cli_writes_standalone_html(self) -> None:
+        report = report_with(run_record(48))
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "report.json"
+            output = Path(directory) / "report.html"
+            source.write_text(json.dumps(report), encoding="utf-8")
+            for presentation_only in (False, True):
+                with self.subTest(presentation_only=presentation_only):
+                    command = [sys.executable, str(REPORT_SCRIPT), str(source), "--output", str(output)]
+                    if presentation_only:
+                        command.append("--presentation-only")
+                    result = subprocess.run(
+                        command, check=False, capture_output=True, text=True,
+                        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rendered = output.read_text(encoding="utf-8")
+                    self.assertIn('id="depth-explorer"', rendered)
+                    if presentation_only:
+                        self.assertIn("AI Energy Audit", rendered)
+                        self.assertIn("Fixed-token gate: blocked", rendered)
+                    else:
+                        self.assertIn("Gemma 4 depth report", rendered)
+                        self.assertIn("Fixed-token comparison gate: blocked", rendered)
+
+
+if __name__ == "__main__":
+    unittest.main()
