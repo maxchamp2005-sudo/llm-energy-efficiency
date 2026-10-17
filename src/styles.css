@@ -602,3 +602,21 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
   .datacenter-copy h2 { margin-bottom: 19px; font-size: 34px; }
   .datacenter-copy p { font-size: 20px; }
 }
+
+/* Decoder screenshots stay full-size in aspect ratio and stack for clear reading. */
+.depth-comparison-section { padding-block: clamp(58px, 8vw, 96px); }
+.depth-comparison-section h2 { max-width: 24ch; margin: 0 0 28px; font-size: clamp(32px, 4.2vw, 50px); line-height: 1.12; letter-spacing: -.045em; }
+.depth-comparison-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 42px; }
+.depth-comparison-figure { width: min(100%, 900px); margin: 0; }
+.depth-image-link { display: block; padding: 8px; border: 1px solid #c8c8bc; background: #fff; }
+.depth-image-link img { display: block; width: 100%; height: auto; }
+.depth-comparison-figure figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px 30px; margin-top: 15px; color: #41483f; font-size: 18px; line-height: 1.65; }
+.depth-comparison-figure figcaption a { flex: 0 0 auto; color: #735d1d; font-size: 18px; text-underline-offset: 4px; }
+@media(max-width:640px) {
+  .depth-comparison-section { padding-block: 48px; }
+  .depth-comparison-section h2 { margin-bottom: 23px; font-size: 34px; }
+  .depth-comparison-stack { gap: 34px; }
+  .depth-image-link { padding: 4px; }
+  .depth-comparison-figure figcaption { flex-direction: column; gap: 10px; font-size: 18px; }
+  .depth-comparison-figure figcaption a { font-size: 18px; }
+}

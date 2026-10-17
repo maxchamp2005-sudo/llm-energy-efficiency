@@ -6,7 +6,7 @@ At this hackathon, we ran **Gemma 4 locally on a GPU** and recorded electrical l
 
 <img src="docs/hackathon-team.jpg" alt="Team AC/DC working at the hackathon" width="560">
 
-**[Run the demo](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#demo)** · **[View the six-slide pitch](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#pitch)** · **[Download the deck](docs/hackathon-pitch.pptx)**
+**[Run the demo](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#demo)** · **[View the eight-slide pitch](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#pitch)** · **[Download the deck](docs/hackathon-pitch.pptx)**
 
 ## Isolated Enterprise Datacenter
 
@@ -23,6 +23,16 @@ For a small-scale demonstration at the hackathon, we used a local workstation wi
 ![UT61B apparent power trace at 116 V RMS, with apparent power in VA over elapsed seconds](docs/ut61b-apparent-power.jpg)
 
 **Apparent power (VA) at 116 V RMS over elapsed time.** Real power (W) = apparent power (VA) × true power factor. Energy per token needs real watt-hours and matched token counts.
+
+## Decoder-layer comparison
+
+[![Decoder-depth trial 1 traces for 16-, 32- and 48-layer configurations](docs/decoder-depth-traces.jpg)](docs/decoder-depth-traces.jpg)
+
+Trial 1 compares 16-, 32- and 48-layer configurations, including a repeat 48-layer run. Solid curves show apparent power (VA). Dashed curves show estimated J/token assuming PF = 1.
+
+[![Decoder-depth batch readings for 16-, 32- and 48-layer trials](docs/decoder-depth-batch-readings.jpg)](docs/decoder-depth-batch-readings.jpg)
+
+The 16-layer run reports 2.03 J/token under PF = 1, compared with 5.45 J/token for the initial 48-layer run. Run durations differ, and quality results are not shown.
 
 ## What we built
 

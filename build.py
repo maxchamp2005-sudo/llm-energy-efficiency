@@ -157,7 +157,7 @@ def main() -> None:
     const footerText = {{
       home: "Local Gemma 4 measurement · Code and presentation on GitHub",
       demo: "Illustrative browser demo · No production results claimed",
-      pitch: "Hackathon pitch · Six slides"
+      pitch: "Hackathon pitch · Eight slides"
     }};
     let current = "home";
 
@@ -168,7 +168,7 @@ def main() -> None:
       nav.innerHTML = navMarkup[page];
       footerContext.textContent = footerText[page];
       if (page === "pitch") window.dispatchEvent(new Event("pitchviewshown"));
-      if (["datacenter", "trace", "case", "method", "pilot", "top"].includes(hash)) {{
+      if (["datacenter", "trace", "depth-comparison", "case", "method", "pilot", "top"].includes(hash)) {{
         window.requestAnimationFrame(() => {{
           const target = document.getElementById(hash);
           if (target) {{
@@ -186,7 +186,7 @@ def main() -> None:
     function route() {{
       const hash = decodeURIComponent(location.hash.slice(1));
       if (hash === "demo" || hash === "pitch") selectPage(hash, hash);
-      else if (["datacenter", "trace", "case", "method", "pilot", "top"].includes(hash)) selectPage("home", hash);
+      else if (["datacenter", "trace", "depth-comparison", "case", "method", "pilot", "top"].includes(hash)) selectPage("home", hash);
       else if (!hash) selectPage("home", "");
       else if (hash !== "content") selectPage(current, "");
     }}
