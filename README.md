@@ -6,7 +6,17 @@ At this hackathon, we ran **Gemma 4 locally on a GPU** and recorded electrical l
 
 <img src="docs/hackathon-team.jpg" alt="Team AC/DC working at the hackathon" width="560">
 
-**[Run the demo](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#demo)** · **[View the five-slide pitch](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#pitch)** · **[Download the deck](docs/hackathon-pitch.pptx)**
+**[Run the demo](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#demo)** · **[View the six-slide pitch](https://maxchamp2005-sudo.github.io/llm-energy-efficiency/#pitch)** · **[Download the deck](docs/hackathon-pitch.pptx)**
+
+## Isolated Enterprise Datacenter
+
+Isolated enterprise data centers process all LLM requests on hardware within their own perimeter, without internet access. Their power budget limits the inference capacity available to users.
+
+For a small-scale demonstration at the hackathon, we used a local workstation with two GPUs: an NVIDIA GeForce RTX 5060 and an AMD Radeon 7900.
+
+![Dual-GPU workstation with electrical measurement equipment beside the computer](docs/isolated-datacenter-workstation.jpg)
+
+*Hackathon workstation used for a small-scale demonstration.*
 
 ## Hackathon measurement trace
 
@@ -38,6 +48,6 @@ To rebuild after editing `src/`, run `python3 build.py` (Python standard library
 
 ## License and references
 
-Original source code is available under the [MIT license](LICENSE). The project owner supplied the team photo; third-party references retain their own terms.
+Original source code is available under the [MIT license](LICENSE). The project owner supplied the team and workstation photos; third-party references retain their own terms.
 
 [Measurement research and full technical deck](docs/research-deck.pptx).

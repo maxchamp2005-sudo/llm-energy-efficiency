@@ -583,3 +583,22 @@ body { font-size: 18px; line-height: 1.62; -webkit-font-smoothing: auto; }
   .measurement-image-link { padding: 4px; }
   .measurement-figure figcaption { grid-template-columns: minmax(0, 1fr); gap: 12px; font-size: 18px; }
 }
+
+/* Explain the isolated enterprise setting beside the hackathon workstation photo. */
+.datacenter-section { padding-block: clamp(58px, 8vw, 96px); }
+.datacenter-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(28px, 6vw, 76px); align-items: center; }
+.datacenter-copy h2 { max-width: 17ch; margin: 0 0 24px; color: var(--cream); font-size: clamp(32px, 4.2vw, 50px); line-height: 1.12; letter-spacing: -.045em; }
+.datacenter-copy p { margin: 0 0 18px; color: #d0d3cc; font-size: 20px; line-height: 1.65; }
+.datacenter-copy p:last-child { margin-bottom: 0; color: var(--amber-light); }
+.datacenter-photo { min-width: 0; margin: 0; }
+.datacenter-photo img { display: block; width: 100%; height: auto; border: 1px solid rgba(241, 238, 228, .2); background: #151817; }
+.datacenter-photo figcaption { margin-top: 11px; color: #c7cdc3; font-size: 16px; line-height: 1.5; }
+@media(max-width:900px) {
+  .datacenter-grid { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: 24px; }
+}
+@media(max-width:640px) {
+  .datacenter-section { padding-block: 48px; }
+  .datacenter-grid { grid-template-columns: minmax(0, 1fr); gap: 27px; }
+  .datacenter-copy h2 { margin-bottom: 19px; font-size: 34px; }
+  .datacenter-copy p { font-size: 20px; }
+}

@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const total = window.slideImages ? Object.keys(window.slideImages).length : 5;
+  const total = window.slideImages ? Object.keys(window.slideImages).length : 6;
   const image = document.getElementById("mainSlide");
   const strip = document.getElementById("thumbnails");
   const previous = document.getElementById("previous");
