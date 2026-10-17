@@ -1,0 +1,118 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A hackathon prototype for comparing LLM electricity use per accepted task."><title>AI Energy Audit · Hackathon prototype</title><link rel="stylesheet" href="styles.css"></head><body>
+<a class="skip-link" href="#main">Skip to content</a><header class="site-header"><a class="wordmark" href="./">AI ENERGY AUDIT <small>HACKATHON PROTOTYPE</small></a><nav class="main-nav"><a href="#case">Prototype</a><a href="#method">Technical notes</a><a class="nav-cta" href="demo/">Run demo</a></nav></header><main id="main">
+<section class="hackathon-hero" id="top"><div class="wrap hackathon-hero-grid"><div class="hackathon-copy"><p class="eyebrow">Built at this hackathon</p><h1>AI energy<br><em>audit prototype</em></h1><p class="hero-deck">At this hackathon, we built an open-source prototype that compares electricity per successful AI task for data centers with limited power.</p><div class="hero-actions"><a class="button button-amber" href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">Code and presentation</a><a class="button button-outline" href="demo/">Run the demo</a></div></div><figure class="hackathon-photo"><img src="assets/hackathon-team.jpg" alt="People building the prototype at a hackathon table, with laptops and electrical measurement equipment"><figcaption>Building the prototype at the hackathon</figcaption></figure></div></section>
+<section class="section section-cream prototype-section" id="case"><div class="wrap"><p class="eyebrow eyebrow-dark">The working prototype</p><h2>A lower energy number still has to pass the service test</h2><div class="prototype-grid"><div><p class="large-copy">Enter two batches of LLM work. The prototype compares Wh per accepted task and checks the quality and response-time limits.</p><p>In this demo, B uses less energy per accepted task, but misses both service limits.</p><a class="button button-dark" href="demo/">Try this comparison</a></div><figure class="prototype-figure"><img src="assets/prototype-comparison.svg" alt="Illustrative demo: A uses 0.500 Wh per accepted task and passes; B uses 0.415 Wh per accepted task and fails service limits"><figcaption>Illustrative inputs: A accepts 96% of tasks at 820 ms p95. B accepts 94% at 1,120 ms. The limits are 95% and 1,000 ms.</figcaption></figure></div><p class="prototype-status">The working demo calculates from entered data. Meter and GPU collection remain the next validation step.</p></div></section>
+<section class="section section-charcoal code-section"><div class="wrap"><p class="eyebrow">Everything in GitHub</p><h2>Code, demo and presentation together</h2><p class="section-intro">The repository includes readable HTML, CSS and JavaScript, the comparison example, this photo and the short pitch deck.</p><div class="hero-actions"><a class="button button-amber" href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">Open repository</a><a class="button button-outline" href="pitch/">View the short pitch</a></div></div></section>
+<details class="technical-notes" id="method"><summary class="wrap">Technical notes and measurement plan <span aria-hidden="true">+</span></summary><div class="technical-content">    <section class="section section-cream" id="technical-case">
+      <div class="wrap">
+        <div class="section-topline"><span>THE DECISION</span><span>01 — 04</span></div>
+        <div class="case-grid">
+          <div>
+            <p class="eyebrow eyebrow-dark">For operators with a choice to make</p>
+            <h2>When two configurations both work, which one earns its place?</h2>
+          </div>
+          <div class="case-copy">
+            <p class="large-copy">A model, serving stack, batching policy, or quantization change can alter energy use and service quality at the same time. A useful comparison holds the workload and acceptance rules steady, then measures what each configuration consumes.</p>
+            <p>This is for an enterprise team evaluating a specific deployment decision—not a universal data-center score. The pilot starts with one representative workload and a clear operational threshold for quality, time to first token (TTFT), and time per output token (TPOT).</p>
+            <a class="text-link" href="demo/">See how the batch comparison works <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+        <div class="decision-strip">
+          <div class="decision-cell decision-label">A decision<br>with evidence</div>
+          <div class="decision-cell"><span class="cell-index">INPUT</span><strong>Same fixed task set</strong><p>Prompts, sampling rules, warm-up, concurrency, and evaluation criteria are held constant.</p></div>
+          <div class="decision-cell"><span class="cell-index">GATES</span><strong>Service stays in bounds</strong><p>A lower energy result is not eligible if quality acceptance or latency misses its threshold.</p></div>
+          <div class="decision-cell"><span class="cell-index">OUTPUT</span><strong>Wh per accepted task</strong><p>Batch energy is divided by tasks that complete and pass the agreed quality check.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-charcoal" id="measurement-details">
+      <div class="wrap">
+        <div class="section-topline"><span>THE MEASUREMENT MODEL</span><span>02 — 04</span></div>
+        <div class="section-heading-row">
+          <div><p class="eyebrow">Two boundaries, one workload</p><h2>Read the wall.<br><em>Explain the device.</em></h2></div>
+          <p class="section-intro">The supply meter answers what the included equipment used. GPU telemetry helps explain how an accelerator behaved. Keep both observations aligned in time, and keep their totals separate.</p>
+        </div>
+        <div class="boundary-grid">
+          <article class="boundary-card boundary-system">
+            <div class="card-kicker"><span class="icon-ring">01</span> PRIMARY ENERGY RESULT</div>
+            <h3>Whole-system supply energy</h3>
+            <p>Measure real power or cumulative Wh at a defined, suitably rated supply boundary. Include every feed inside that boundary and state which loads sit outside it.</p>
+            <div class="equation"><span>E<sub>supply</sub></span><b>∫ P(t) dt</b><small>across the matched batch window</small></div>
+            <p class="card-foot">This is the candidate numerator for Wh per accepted task.</p>
+          </article>
+          <article class="boundary-card boundary-gpu">
+            <div class="card-kicker"><span class="icon-ring">02</span> SECONDARY TELEMETRY</div>
+            <h3>GPU device counters</h3>
+            <p>Read supported per-device power or energy counters locally. Align their time window to the workload and report the sensor scope, sampling limits, and device support.</p>
+            <div class="equation equation-gpu"><span>E<sub>GPU</sub></span><b>Σ Δcounter</b><small>per device, same time window</small></div>
+            <p class="card-foot">Use this to explain the supply result. Never add it to supply Wh.</p>
+          </article>
+        </div>
+        <div class="boundary-warning"><span aria-hidden="true">↳</span><p><strong>Do not double count.</strong> GPU energy is already inside a whole-system supply reading when those GPUs are downstream of the meter.</p></div>
+
+        <div class="metric-band">
+          <div><span class="metric-number">Wh</span><span class="metric-caption">gross batch energy</span></div>
+          <div class="metric-operator">÷</div>
+          <div><span class="metric-number metric-amber">accepted</span><span class="metric-caption">completed tasks</span></div>
+          <div class="metric-operator">=</div>
+          <div><span class="metric-number metric-result">Wh / task</span><span class="metric-caption">service-gated efficiency</span></div>
+        </div>
+        <p class="metric-caveat">For concurrent inference this is a batch average, not causal per-request metering. Keep the request mix, batch window, failed work, and quality evaluation visible.</p>
+      </div>
+    </section>
+
+    <section class="section section-grid" id="pilot">
+      <div class="wrap">
+        <div class="section-topline"><span>THE PILOT SHAPE</span><span>03 — 04</span></div>
+        <div class="pilot-intro">
+          <div><p class="eyebrow eyebrow-dark">Designed for an isolated environment</p><h2>One bounded question.<br>One defensible comparison.</h2></div>
+          <p class="large-copy">A candidate pilot correlates real supply energy with request and task logs, then uses GPU telemetry as a separate diagnostic. The deployment can be designed with a local collector and local results, with no outbound service calls; the meter’s own data path must be validated before the study.</p>
+        </div>
+        <div class="pilot-steps">
+          <article><span class="step-mark">A</span><h3>Define the boundary</h3><p>Choose the metered feeds and included equipment. Record exclusions such as cooling, UPS losses, or shared infrastructure.</p></article>
+          <article><span class="step-mark">B</span><h3>Freeze the workload</h3><p>Fix the task set, warm-up, sampling, and evaluation. Agree on quality acceptance, TTFT, and TPOT targets before comparing.</p></article>
+          <article><span class="step-mark">C</span><h3>Align each run</h3><p>Match meter readings, GPU counters, and request/task events to the same start and end. Repeat trials and retain failures.</p></article>
+          <article><span class="step-mark">D</span><h3>Decide inside the gate</h3><p>Compare Wh per accepted task only after each candidate clears the agreed service thresholds. Report uncertainty and boundary limits.</p></article>
+        </div>
+        <div class="fit-note"><span class="fit-label">ADDED VALUE TO TEST</span><p>Tools such as NVIDIA DCGM, AIPerf, MLPerf, and Zeus address useful parts of GPU telemetry, benchmarking, or energy analysis. The pilot’s proposed added value is the aligned view across real supply energy, production-shaped task outcomes, quality, and latency under one fixed acceptance rule. Keep existing tools where they fit; test whether this combined evidence changes the decision.</p></div>
+      </div>
+    </section>
+
+    <section class="section section-cream section-economics">
+      <div class="wrap">
+        <div class="section-topline"><span>THE BUSINESS CASE</span><span>04 — 04</span></div>
+        <div class="economics-grid">
+          <div><p class="eyebrow eyebrow-dark">Translate carefully</p><h2>Expose energy cost.<br>Earn the savings claim.</h2><p class="large-copy">Metered consumption can make energy exposure legible. A lower lab result becomes a cash-savings estimate only after runtime, the tariff, and the applicable contract charges are verified.</p></div>
+          <div class="economics-ledger">
+            <div class="ledger-row"><span>01 / COST EXPOSURE</span><strong>Measured energy × applicable rate × eligible runtime</strong><p>Report the measured boundary and the rate used. Demand, capacity, fixed, and pass-through charges may not move with kWh.</p></div>
+            <div class="ledger-row ledger-highlight"><span>02 / CONDITIONAL SAVINGS</span><strong>Validated energy delta × variable charges that actually change</strong><p>Apply only to workloads that can adopt the eligible configuration. Confirm billing treatment and operational runtime before calling it cash savings.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="context-section">
+      <div class="wrap context-grid">
+        <div><p class="eyebrow">Why the decision matters</p><h2>Efficiency evidence helps operators use scarce capacity well.</h2></div>
+        <div class="context-copy"><p>Electricity supply and interconnection can move on a different schedule from data-center construction. The IEA describes grid expansion timelines of roughly 5–15 years in some cases, compared with 1–3 years for data centers. Measurement can inform workload and infrastructure choices; it cannot create feeder capacity, solve cooling constraints, or accelerate a utility connection.</p><p>Likewise, PUE describes facility overhead relative to IT energy. It does not say how efficiently a given model completes accepted work. An LLM workload metric fills a different question, with its own clearly declared boundary.</p><div class="context-source"><span>CONTEXT, NOT A PROMISE</span><a href="https://www.iea.org/reports/electricity-2026/grids" target="_blank" rel="noopener">IEA · Electricity 2026: Grids ↗</a><a href="https://datacenter.uptimeinstitute.com/rs/711-RIA-145/images/2025.Annual.Survey.Report.pdf?version=0" target="_blank" rel="noopener">Uptime Institute · 2025 Annual Survey ↗</a></div></div>
+      </div>
+    </section>
+
+    <section class="section section-charcoal instrument-section">
+      <div class="wrap instrument-grid">
+        <div><p class="eyebrow">Instrumentation reality check</p><h2>Current is useful.<br>Current is not energy.</h2><p class="section-intro">Clamp and bench meters can help diagnose load, but neither named instrument is a direct W/Wh meter. Select an appropriately rated real-energy meter for the supply measurement.</p></div>
+        <details class="instrument-details">
+          <summary><span>Open instrument notes</span><span class="summary-icon" aria-hidden="true">+</span></summary>
+          <div class="details-body">
+            <div class="instrument-row"><strong>Fluke 376 FC</strong><p>True-RMS clamp meter for AC/DC current diagnostics. Its current reading supports a load check; by itself it does not provide supply real power or cumulative Wh for this study. Confirm rated safe access and a fully local data path for any future workflow.</p><a href="https://www.fluke.com/en-us/product/electrical-testing/clamp-meters/fluke-376-fc" target="_blank" rel="noopener">Manufacturer product page ↗</a></div>
+            <div class="instrument-row"><strong>Original UNI-T UT61B</strong><p>Not the UT61B+ variant. The original model is discontinued, is not True-RMS, and has a 10 A terminal-current limit. Treat it as limited bench diagnostics, not a server-feed clamp or direct W/Wh instrument.</p><a href="https://meters.uni-trend.com/product/ut61-series/" target="_blank" rel="noopener">UNI-T UT61 series ↗</a></div>
+            <div class="instrument-row"><strong>Native GPU telemetry</strong><p>DCGM-exported NVIDIA metrics can supply device observations where supported. They remain a distinct boundary from wall or supply energy and should not be summed into it.</p><a href="https://docs.nvidia.com/datacenter/dcgm/latest/reference/dcgm-exporter-metrics.html" target="_blank" rel="noopener">NVIDIA DCGM exporter metrics ↗</a></div>
+            <div class="instrument-row"><strong>Decision economics</strong><p>Unit economics connects resource consumption to a useful unit of work. The pilot should keep that unit tied to a task that passes the agreed quality threshold.</p><a href="https://www.finops.org/framework/capabilities/unit-economics/" target="_blank" rel="noopener">FinOps Foundation · Unit economics ↗</a></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+</div></details>
+</main><footer class="site-footer"><div class="wrap footer-content"><a class="footer-brand" href="./">AI ENERGY AUDIT</a><span>Hackathon prototype</span><div><a href="demo/">Demo</a><a href="pitch/">Pitch</a><a href="https://github.com/maxchamp2005-sudo/llm-energy-efficiency">GitHub</a></div></div></footer></body></html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171918">
+  <meta name="description" content="A browser-only illustrative calculator for service-gated, batch-level LLM energy comparison.">
+  <title>Batch Energy Demo · AI Energy Audit</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="demo.js" defer></script>
+</head>
+<body class="subpage">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../" aria-label="AI Energy Audit home"><span class="wordmark-mark" aria-hidden="true">M<span>/</span></span><span>AI ENERGY AUDIT <small>HACKATHON PROTOTYPE</small></span></a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="../#case">The case</a>
+      <a href="../#method">Measurement</a>
+      <a class="nav-cta" href="../pitch/">Research deck <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="subpage-hero">
+      <div class="wrap">
+        <a class="crumb" href="../">← Back to the decision brief</a>
+        <p class="eyebrow"><span class="status-dot"></span> Browser-only · No data is sent</p>
+        <h1>Compare a batch.<br><em>Respect the service gate.</em></h1>
+        <p class="hero-deck">Explore gross Wh per quality-accepted task alongside output tokens per kWh and average batch power. A lower raw energy figure cannot lead if the candidate misses the fixed acceptance or latency rule.</p>
+      </div>
+    </section>
+    <section class="demo-main">
+      <div class="wrap">
+        <div class="demo-label"><span>01 / FIXED TEST RULES</span><span class="sample-pill">Illustrative sample data</span></div>
+        <section class="demo-panel" aria-labelledby="rules-title">
+          <h2 id="rules-title">Hold the request set and thresholds constant</h2>
+          <p>Enter one fixed set of submitted tasks and the same acceptance rule for both configurations. A task counts as accepted only when it completed and passed your agreed quality check. Here, p95 is end-to-end request latency from service acceptance to final response; use the same definition and window for both runs. A real pilot should also set separate TTFT and TPOT gates.</p>
+          <div class="common-gates">
+            <div class="field"><label for="submitted">Tasks submitted in the fixed set</label><input id="submitted" name="submitted" type="number" min="1" step="1" value="100" inputmode="numeric"><small>Shared denominator for acceptance rate.</small></div>
+            <div class="field"><label for="minAcceptance">Minimum accepted-task rate</label><div class="suffix-wrap"><input id="minAcceptance" name="minAcceptance" type="number" min="0" max="100" step="0.1" value="95" inputmode="decimal"><span class="suffix">%</span></div><small>Hard quality and completion gate.</small></div>
+            <div class="field"><label for="maxP95">Maximum p95 end-to-end latency</label><div class="suffix-wrap"><input id="maxP95" name="maxP95" type="number" min="1" step="1" value="1000" inputmode="numeric"><span class="suffix">ms</span></div><small>A missing candidate p95 leaves its latency gate unverified.</small></div>
+          </div>
+        </section>
+
+        <div class="demo-label"><span>02 / BATCH INPUTS</span><span>Use matched boundaries and test conditions</span></div>
+        <div class="scenario-grid">
+          <section class="scenario-card" aria-labelledby="baseline-title">
+            <header class="scenario-head"><h2 id="baseline-title">Configuration A</h2><span>Reference</span></header>
+            <div class="scenario-fields">
+              <div class="field"><label for="aEnergy">Gross supply energy</label><div class="suffix-wrap"><input id="aEnergy" type="number" min="0.001" step="any" value="48" inputmode="decimal"><span class="suffix">Wh</span></div><small>Real energy for the full batch window.</small></div>
+              <div class="field"><label for="aCompleted">Completed tasks</label><input id="aCompleted" type="number" min="0" step="1" value="100" inputmode="numeric"><small>Successful outputs in this batch.</small></div>
+              <div class="field"><label for="aAccepted">Quality-accepted tasks</label><input id="aAccepted" type="number" min="0" step="1" value="96" inputmode="numeric"><small>Must be ≤ completed tasks.</small></div>
+              <div class="field"><label for="aTokens">Total output tokens</label><input id="aTokens" type="number" min="0" step="1" value="15500" inputmode="numeric"><small>Diagnostic for this batch only.</small></div>
+              <div class="field"><label for="aDuration">Batch duration</label><div class="suffix-wrap"><input id="aDuration" type="number" min="0.001" step="any" value="12" inputmode="decimal"><span class="suffix">min</span></div><small>From matching energy window.</small></div>
+              <div class="field"><label for="aP95">Measured p95 end-to-end latency</label><div class="suffix-wrap"><input id="aP95" type="number" min="0.001" step="any" value="820" inputmode="decimal"><span class="suffix">ms</span></div><small>Service acceptance to final response.</small></div>
+            </div>
+          </section>
+          <section class="scenario-card candidate" aria-labelledby="candidate-title">
+            <header class="scenario-head"><h2 id="candidate-title">Configuration B</h2><span>Candidate</span></header>
+            <div class="scenario-fields">
+              <div class="field"><label for="bEnergy">Gross supply energy</label><div class="suffix-wrap"><input id="bEnergy" type="number" min="0.001" step="any" value="39" inputmode="decimal"><span class="suffix">Wh</span></div><small>Real energy for the full batch window.</small></div>
+              <div class="field"><label for="bCompleted">Completed tasks</label><input id="bCompleted" type="number" min="0" step="1" value="100" inputmode="numeric"><small>Successful outputs in this batch.</small></div>
+              <div class="field"><label for="bAccepted">Quality-accepted tasks</label><input id="bAccepted" type="number" min="0" step="1" value="94" inputmode="numeric"><small>Must be ≤ completed tasks.</small></div>
+              <div class="field"><label for="bTokens">Total output tokens</label><input id="bTokens" type="number" min="0" step="1" value="15600" inputmode="numeric"><small>Diagnostic for this batch only.</small></div>
+              <div class="field"><label for="bDuration">Batch duration</label><div class="suffix-wrap"><input id="bDuration" type="number" min="0.001" step="any" value="11" inputmode="decimal"><span class="suffix">min</span></div><small>From matching energy window.</small></div>
+              <div class="field"><label for="bP95">Measured p95 end-to-end latency</label><div class="suffix-wrap"><input id="bP95" type="number" min="0.001" step="any" value="1120" inputmode="decimal"><span class="suffix">ms</span></div><small>Service acceptance to final response.</small></div>
+            </div>
+          </section>
+        </div>
+        <p id="formError" class="form-error" role="alert"></p>
+        <div class="demo-actions">
+          <button class="button button-amber" id="exportReport" type="button">Export report as JSON <span aria-hidden="true">↓</span></button>
+          <button class="button button-muted" id="resetSample" type="button">Reset illustrative sample</button>
+          <button class="button-plain" id="clearP95" type="button">Clear both p95 values</button>
+        </div>
+
+        <section class="results-section" aria-labelledby="results-title">
+          <div class="results-heading"><h2 id="results-title">Batch comparison</h2><span id="resultContext">Illustrative values · browser calculation</span></div>
+          <div class="result-summary" id="resultSummary" data-tone="blocked" aria-live="polite"></div>
+          <div class="result-cards" id="resultCards"></div>
+          <p class="demo-caveat">Wh per accepted task = gross supply Wh ÷ quality-accepted tasks. Output tokens per kWh is a batch diagnostic; it is not quality-adjusted by itself. Average watts = gross Wh ÷ batch hours. These figures describe the whole measured batch and do not allocate causal energy to individual concurrent requests.</p>
+        </section>
+
+        <section class="demo-panel ac-panel" aria-labelledby="ac-title">
+          <div class="demo-label"><span>03 / SINGLE-PHASE AC CHECK</span><span>Requires true power factor</span></div>
+          <h2 id="ac-title">Estimate real power from RMS voltage, current, and true PF</h2>
+          <p>This small calculator is only as good as its inputs. Current alone does not establish real watts; apparent power V × I is in VA. Prefer a suitable real-energy meter for the study.</p>
+          <div class="common-gates">
+            <div class="field"><label for="acVolts">RMS voltage</label><div class="suffix-wrap"><input id="acVolts" type="number" min="0.001" step="any" value="116" inputmode="decimal"><span class="suffix">V</span></div><small>Illustrative supply voltage.</small></div>
+            <div class="field"><label for="acAmps">RMS current</label><div class="suffix-wrap"><input id="acAmps" type="number" min="0" step="any" value="8" inputmode="decimal"><span class="suffix">A</span></div><small>Current reading alone is insufficient.</small></div>
+            <div class="field"><label for="acPf">True power factor</label><div class="suffix-wrap"><input id="acPf" type="number" min="0.01" max="1" step="any" value="0.92" inputmode="decimal"><span class="suffix">PF</span></div><small>Enter a verified value from 0 to 1.</small></div>
+            <div class="field"><label for="acHours">Duration</label><div class="suffix-wrap"><input id="acHours" type="number" min="0" step="any" value="0.5" inputmode="decimal"><span class="suffix">h</span></div><small>Used to estimate energy in Wh.</small></div>
+          </div>
+          <div class="ac-result" aria-live="polite"><div><span>Estimated real power</span><strong id="acWatts">—</strong></div><div><span>Estimated energy</span><strong id="acEnergy">—</strong></div></div>
+          <p class="ac-note">P = Vrms × Irms × true PF (W) · E = P × duration (Wh). For distorted or non-linear loads use true PF, not displacement PF. This estimate does not turn either listed clamp or bench meter into a direct watt-hour instrument.</p>
+        </section>
+        <div class="data-note"><strong>Prototype boundary:</strong> this page runs locally in your browser, sends no form data to a server, and stores nothing after you leave. It does not read a meter, GPU, model, or request log. Replace illustrative values only with data from an independently validated measurement process.</div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="wrap footer-content"><a class="footer-brand" href="../">MEASURING LLM ENERGY EFFICIENCY</a><span>Illustrative browser demo · No production results claimed</span><div><a href="../">Decision brief</a><a href="../pitch/">Pitch deck</a></div></div></footer>
+</body>
+</html>
