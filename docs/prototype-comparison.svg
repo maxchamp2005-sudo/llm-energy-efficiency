@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 460" role="img" aria-labelledby="title desc">
+<title id="title">Wh per accepted task: illustrative prototype comparison</title>
+<desc id="desc">A: 0.500, passes service limits. B: 0.415, fails service limits. Bars start at zero and share the same scale. These are demo inputs, not measurements.</desc>
+<rect width="1100" height="460" fill="#f1eee4"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#252a22">
+<text x="50" y="85" font-size="56" font-weight="700">Wh / accepted task</text>
+<text x="50" y="211" font-size="60" font-weight="700">A</text>
+<text x="50" y="351" font-size="60" font-weight="700">B</text>
+<rect x="135" y="140" width="650" height="100" fill="#d8b44e"/>
+<rect x="135" y="280" width="539.36" height="100" fill="#a84437"/>
+<text x="460" y="208" text-anchor="middle" font-size="60" font-weight="700">0.500</text>
+<text x="405" y="348" text-anchor="middle" fill="#fff" font-size="60" font-weight="700">0.415</text>
+<text x="825" y="208" font-size="54" fill="#35432f">Pass</text>
+<text x="715" y="348" font-size="54" fill="#9a3028">Fail</text>
+<text x="50" y="433" font-size="44">Illustrative inputs · shared service limits</text>
+</g></svg>
