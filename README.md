@@ -46,6 +46,13 @@ Open http://localhost:8000/. The site includes the demo and pitch; keep the `doc
 
 To rebuild after editing `src/`, run `python3 build.py` (Python standard library only).
 
+## Measurement scripts
+
+The [measurement toolkit](measurement/) contains the UT61B and NVIDIA collectors,
+fixed-token Gemma 4 runner, VictoriaMetrics remote-write/readback, experimental
+layer pruning, and standalone trace charts. See its README for setup and tests.
+The compact UT61B energy chart explicitly estimates J/token assuming PF=1.
+
 ## License and references
 
 Original source code is available under the [MIT license](LICENSE). The project owner supplied the team and workstation photos; third-party references retain their own terms.
